@@ -10,6 +10,12 @@ private struct APIMessage: Codable {
 private let netLog = Logger(subsystem: "AIOverlay", category: "network")
 
 final class ChatClient: ObservableObject {
+    enum Backend: String, CaseIterable, Identifiable {
+        case chatgpt
+        case ollama
+        var id: String { rawValue }
+    }
+
     // Persist the system preamble so users can customize it in settings
     var systemPreamble: String {
         didSet {
@@ -20,11 +26,24 @@ final class ChatClient: ObservableObject {
         }
     }
 
+    // User-configurable backend and API key
+    var backend: Backend {
+        didSet { UserDefaults.standard.set(backend.rawValue, forKey: "backend") }
+    }
+
+    var apiKey: String {
+        didSet { UserDefaults.standard.set(apiKey, forKey: "apiKey") }
+    }
+
     private var history: [APIMessage] = []
 
     init() {
         self.systemPreamble = UserDefaults.standard.string(forKey: "systemPreamble")
             ?? "You are a helpful macOS overlay assistant."
+        let backendRaw = UserDefaults.standard.string(forKey: "backend")
+            ?? Backend.chatgpt.rawValue
+        self.backend = Backend(rawValue: backendRaw) ?? .chatgpt
+        self.apiKey = UserDefaults.standard.string(forKey: "apiKey") ?? ""
         self.history = [APIMessage(role: "system", content: self.systemPreamble)]
     }
 
@@ -50,6 +69,8 @@ final class ChatClient: ObservableObject {
         req.timeoutInterval = 60
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         let body: [String: Any] = [
+            "backend": backend.rawValue,
+            "api_key": apiKey,
             "messages": history.map { ["role": $0.role, "content": $0.content] }
         ]
         req.httpBody = try? JSONSerialization.data(withJSONObject: body, options: [])

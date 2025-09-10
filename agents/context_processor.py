@@ -17,6 +17,8 @@ class Message(BaseModel):
 class ChatPayload(BaseModel):
     """Conversation payload for the chat endpoint."""
     messages: List[Message]
+    backend: str | None = None
+    api_key: str | None = None
 
 
 def build_context_graph():
@@ -72,7 +74,7 @@ async def process(payload: ContextPayload) -> dict:
 async def chat(payload: ChatPayload) -> dict:
     """Generate a chat response using a LangGraph pipeline."""
     graph = build_chat_graph()
-    state = {"messages": [m.dict() for m in payload.messages]}
+    state = {"messages": [m.model_dump() for m in payload.messages]}
     result = graph.invoke(state)
     return {"response": result["messages"][-1]["content"]}
 
