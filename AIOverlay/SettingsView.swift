@@ -6,6 +6,7 @@ struct SettingsView: View {
     @State private var apiKey = ProcessInfo.processInfo.environment["OPENAI_API_KEY"] ?? ""
     @State private var openAIModel = "gpt-4o-mini"
     @State private var ollamaModel = "llama3.1"
+    @State private var systemPreamble = ""
 
     @Environment(\.dismiss) private var dismiss   // <-- add
 
@@ -20,6 +21,8 @@ struct SettingsView: View {
             } else {
                 TextField("Ollama Model", text: $ollamaModel)
             }
+
+            TextField("System Preamble", text: $systemPreamble)
 
             Button("Apply") {
                 apply()
@@ -36,6 +39,7 @@ struct SettingsView: View {
             case .ollama(let model):
                 useOpenAI = false; ollamaModel = model
             }
+            systemPreamble = chat.systemPreamble
         }
     }
 
@@ -45,5 +49,6 @@ struct SettingsView: View {
         } else {
             chat.backend = .ollama(model: ollamaModel)
         }
+        chat.systemPreamble = systemPreamble
     }
 }

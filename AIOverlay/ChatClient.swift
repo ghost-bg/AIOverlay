@@ -17,7 +17,16 @@ private let netLog = Logger(subsystem: "AIOverlay", category: "network")
 
 final class ChatClient: ObservableObject {
     @Published var backend: ChatBackend = .ollama()  // default to local for easy testing
-    var systemPreamble = "You are a helpful macOS overlay assistant."
+
+    // Persist the system preamble so users can customize it in settings
+    var systemPreamble: String {
+        didSet { UserDefaults.standard.set(systemPreamble, forKey: "systemPreamble") }
+    }
+
+    init() {
+        self.systemPreamble = UserDefaults.standard.string(forKey: "systemPreamble") ??
+            "You are a helpful macOS overlay assistant."
+    }
 
     // Attach screen context to the *next* user message only
     private var pendingContext: String?
