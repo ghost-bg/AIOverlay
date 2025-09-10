@@ -1,24 +1,23 @@
-//
-//  ContentView.swift
-//  AIOverlay
-//
-//  Created by Eric Hu on 10/9/2025.
-//
-
 import SwiftUI
 
 struct ContentView: View {
-    var body: some View {
-        VStack {
-            Image(systemName: "globe")
-                .imageScale(.large)
-                .foregroundStyle(.tint)
-            Text("Hello, world!")
-        }
-        .padding()
-    }
-}
+    @ObservedObject var appVM: AppViewModel
+    @State private var showSettings = false
 
-#Preview {
-    ContentView()
+    var body: some View {
+        VStack(spacing: 12) {
+            Text("Launcher Window").font(.title2)
+            HStack {
+                Button("Toggle Overlay") { appVM.showOverlay() }
+                Button("Settings") { showSettings = true }
+            }
+            Text("Tip: ⌥Space toggles overlay.")
+                .font(.footnote).foregroundStyle(.secondary)
+        }
+        .frame(width: 420, height: 160)
+        .padding()
+        .sheet(isPresented: $showSettings) {
+            SettingsView(chat: appVM.chat)
+        }
+    }
 }
