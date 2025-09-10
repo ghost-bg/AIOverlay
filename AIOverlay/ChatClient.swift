@@ -19,14 +19,25 @@ final class ChatClient: ObservableObject {
     @Published var backend: ChatBackend = .ollama()  // default to local for easy testing
 
     // Persist the system preamble so users can customize it in settings
-    var systemPreamble: String {
-        didSet { UserDefaults.standard.set(systemPreamble, forKey: "systemPreamble") }
+// systemPreamble lives somewhere above; keep your property declaration.
+// Make sure didSet does BOTH: save to defaults and refresh history[0].
+var systemPreamble: String {
+    didSet {
+        UserDefaults.standard.set(systemPreamble, forKey: "systemPreamble")
+        if !history.isEmpty {
+            history[0] = APIMessage(role: "system", content: systemPreamble)
+        }
     }
+}
 
-    init() {
-        self.systemPreamble = UserDefaults.standard.string(forKey: "systemPreamble") ??
-            "You are a helpful macOS overlay assistant."
-    }
+// Keep a single history declaration.
+private var history: [APIMessage] = []
+
+init() {
+    self.systemPreamble = UserDefaults.standard.string(forKey: "systemPreamble")
+        ?? "You are a helpful macOS overlay assistant."
+    self.history = [APIMessage(role: "system", content: self.systemPreamble)]
+}
 
     // Attach screen context to the *next* user message only
     private var pendingContext: String?
@@ -39,17 +50,19 @@ final class ChatClient: ObservableObject {
             pendingContext = nil
         }
 
+        history.append(APIMessage(role: "user", content: userPayload))
+
         switch backend {
         case .openAI(let apiKey, let model):
-            sendOpenAI(apiKey: apiKey, model: model, user: userPayload, completion: completion)
+            sendOpenAI(apiKey: apiKey, model: model, completion: completion)
         case .ollama(let model):
-            sendOllama(model: model, user: userPayload, completion: completion)
+            sendOllama(model: model, completion: completion)
         }
     }
 
     // MARK: - OpenAI
 
-    private func sendOpenAI(apiKey: String, model: String, user: String,
+    private func sendOpenAI(apiKey: String, model: String,
                             completion: @escaping (Result<String, Error>) -> Void) {
         guard let url = URL(string: "https://api.openai.com/v1/chat/completions") else {
             return completion(.failure(URLError(.badURL)))
@@ -63,10 +76,7 @@ final class ChatClient: ObservableObject {
 
         let body: [String: Any] = [
             "model": model,
-            "messages": [
-                ["role": "system", "content": systemPreamble],
-                ["role": "user", "content": user]
-            ]
+            "messages": history.map { ["role": $0.role, "content": $0.content] }
         ]
         req.httpBody = try? JSONSerialization.data(withJSONObject: body, options: [])
 
@@ -108,7 +118,10 @@ final class ChatClient: ObservableObject {
             do {
                 let model = try JSONDecoder().decode(OpenAIResponse.self, from: data)
                 let text = model.choices.first?.message.content ?? "No response."
-                DispatchQueue.main.async { completion(.success(text)) }
+                DispatchQueue.main.async {
+                    self.history.append(APIMessage(role: "assistant", content: text))
+                    completion(.success(text))
+                }
             } catch {
                 let raw = String(data: data, encoding: .utf8) ?? ""
                 netLog.error("⬅️ OpenAI decode failed. Raw=\(raw, privacy: .public)")
@@ -126,7 +139,7 @@ final class ChatClient: ObservableObject {
 
     // MARK: - Ollama
 
-    private func sendOllama(model: String, user: String,
+    private func sendOllama(model: String,
                             completion: @escaping (Result<String, Error>) -> Void) {
         // Prefer 127.0.0.1 over "localhost" to avoid IPv6/loopback resolution issues.
         guard let url = URL(string: "http://127.0.0.1:11434/api/chat") else {
@@ -140,10 +153,7 @@ final class ChatClient: ObservableObject {
 
         let body: [String: Any] = [
             "model": model,
-            "messages": [
-                ["role": "system", "content": systemPreamble],
-                ["role": "user", "content": user]
-            ],
+            "messages": history.map { ["role": $0.role, "content": $0.content] },
             "stream": false
         ]
         req.httpBody = try? JSONSerialization.data(withJSONObject: body, options: [])
@@ -186,7 +196,10 @@ final class ChatClient: ObservableObject {
             do {
                 let model = try JSONDecoder().decode(OllamaResponse.self, from: data)
                 let text = model.message.content
-                DispatchQueue.main.async { completion(.success(text)) }
+                DispatchQueue.main.async {
+                    self.history.append(APIMessage(role: "assistant", content: text))
+                    completion(.success(text))
+                }
             } catch {
                 let raw = String(data: data, encoding: .utf8) ?? ""
                 netLog.error("⬅️ Ollama decode failed. Raw=\(raw, privacy: .public)")
