@@ -19,22 +19,25 @@ final class ChatClient: ObservableObject {
     @Published var backend: ChatBackend = .ollama()  // default to local for easy testing
 
     // Persist the system preamble so users can customize it in settings
-    var systemPreamble: String {
-        didSet {
-            UserDefaults.standard.set(systemPreamble, forKey: "systemPreamble")
-            if !history.isEmpty {
-                history[0] = APIMessage(role: "system", content: systemPreamble)
-            }
+// systemPreamble lives somewhere above; keep your property declaration.
+// Make sure didSet does BOTH: save to defaults and refresh history[0].
+var systemPreamble: String {
+    didSet {
+        UserDefaults.standard.set(systemPreamble, forKey: "systemPreamble")
+        if !history.isEmpty {
+            history[0] = APIMessage(role: "system", content: systemPreamble)
         }
     }
+}
 
-    private var history: [APIMessage]
+// Keep a single history declaration.
+private var history: [APIMessage] = []
 
-    init() {
-        self.systemPreamble = UserDefaults.standard.string(forKey: "systemPreamble") ??
-            "You are a helpful macOS overlay assistant."
-        self.history = [APIMessage(role: "system", content: self.systemPreamble)]
-    }
+init() {
+    self.systemPreamble = UserDefaults.standard.string(forKey: "systemPreamble")
+        ?? "You are a helpful macOS overlay assistant."
+    self.history = [APIMessage(role: "system", content: self.systemPreamble)]
+}
 
     // Attach screen context to the *next* user message only
     private var pendingContext: String?
