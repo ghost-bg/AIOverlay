@@ -13,7 +13,7 @@ struct SettingsView: View {
     var body: some View {
         Form {
             Toggle("Use OpenAI (off = Ollama)", isOn: $useOpenAI)
-                .onChange(of: useOpenAI) { _ in apply() }  // keep: apply but don't dismiss
+                .onChange(of: useOpenAI) { apply() }  // keep: apply but don't dismiss
 
             if useOpenAI {
                 TextField("OpenAI API Key", text: $apiKey)
