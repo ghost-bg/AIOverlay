@@ -38,10 +38,12 @@ final class AppViewModel: ObservableObject {
             onUseScreenContext: { [weak self] in
                 guard let self = self else { return }
                 Task { @MainActor in
+                    self.overlay.hide()
                     let grabbed = await self.context.getContextText()
                     self.messages.append(ChatMessage(sender: .assistant, text: "• Captured preview:\n\(String(grabbed.prefix(300)))…"))
                     self.chat.attachContext(grabbed)
                     self.overlay.setContent(rootView: self.makeOverlayView())
+                    self.overlay.show()
                 }
             }
         )
