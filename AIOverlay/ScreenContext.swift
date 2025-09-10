@@ -1,19 +1,15 @@
 import Foundation
 import AppKit
 import Vision
+import ScreenCaptureKit
+import CoreImage
 
 final class ScreenContext {
     /// Capture the main display, gather a bit of metadata about the
     /// foreground window, run OCR on the screenshot and return everything as
     /// a textual blob suitable for sending as chat context.
     func getContextText() async -> String {
-        guard let screen = NSScreen.main else {
-            return "(no screen)"
-        }
-
-        let frame = screen.frame
-        guard let cgImage = CGWindowListCreateImage(frame, .optionOnScreenOnly,
-                                                    kCGNullWindowID, [.bestResolution]) else {
+        guard let cgImage = await captureMainDisplay() else {
             return "(screenshot failed)"
         }
 
@@ -43,7 +39,7 @@ final class ScreenContext {
         var text = ""
         do {
             try handler.perform([request])
-            let observations = request.results as? [VNRecognizedTextObservation] ?? []
+            let observations = request.results ?? []
             text = observations.compactMap { $0.topCandidates(1).first?.string }
                                  .joined(separator: "\n")
         } catch {
@@ -51,5 +47,57 @@ final class ScreenContext {
         }
 
         return (meta + ["", text]).joined(separator: "\n")
+    }
+
+    /// Capture the main display into a `CGImage` using ScreenCaptureKit.
+    private func captureMainDisplay() async -> CGImage? {
+        do {
+            let content = try await SCShareableContent.current
+            guard let display = content.displays.first else { return nil }
+
+            let filter = SCContentFilter(display: display,
+                                         excludingApplications: [],
+                                         exceptingWindows: [])
+            let config = SCStreamConfiguration()
+            config.width = display.width
+            config.height = display.height
+            config.pixelFormat = kCVPixelFormatType_32BGRA
+
+            let stream = SCStream(filter: filter, configuration: config, delegate: nil)
+            let collector = FrameCollector()
+            try stream.addStreamOutput(collector, type: .screen, sampleHandlerQueue: collector.queue)
+            try await stream.startCapture()
+            defer { stream.stopCapture() }
+
+            return await collector.image
+        } catch {
+            return nil
+        }
+    }
+}
+
+private final class FrameCollector: NSObject, SCStreamOutput {
+    let queue = DispatchQueue(label: "FrameCollector")
+    private let context = CIContext()
+    private var continuation: CheckedContinuation<CGImage?, Never>?
+
+    var image: CGImage? {
+        get async {
+            await withCheckedContinuation { continuation in
+                self.continuation = continuation
+            }
+        }
+    }
+
+    func stream(_ stream: SCStream,
+                didOutputSampleBuffer sampleBuffer: CMSampleBuffer,
+                of type: SCStreamOutputType) {
+        guard continuation != nil,
+              let buffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
+        let ciImage = CIImage(cvImageBuffer: buffer)
+        if let cgImage = context.createCGImage(ciImage, from: ciImage.extent) {
+            continuation?.resume(returning: cgImage)
+            continuation = nil
+        }
     }
 }
