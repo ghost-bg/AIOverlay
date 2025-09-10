@@ -27,8 +27,6 @@ Send conversation history to `http://127.0.0.1:5001/chat`:
 
 ```json
 {
-  "backend": "chatgpt",
-  "api_key": "sk-...",
   "messages": [
     {"role": "system", "content": "..."},
     {"role": "user", "content": "Hello"}
