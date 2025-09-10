@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct OverlayView: View {
-    let messages: [String]
+    let messages: [ChatMessage]
     let onSend: (String) -> Void
     let onUseScreenContext: () -> Void
 
@@ -16,15 +16,30 @@ struct OverlayView: View {
             }
 
             ScrollView {
-                VStack(alignment: .leading, spacing: 6) {
-                    ForEach(messages.indices, id: \.self) { i in
-                        Text(messages[i])
-                            .padding(6)
-                            .background(Color.gray.opacity(0.08))
-                            .cornerRadius(8)
+                VStack(spacing: 6) {
+                    ForEach(messages) { msg in
+                        HStack {
+                            if msg.sender == .assistant {
+                                Text(msg.text)
+                                    .padding(8)
+                                    .background(Color.gray.opacity(0.2))
+                                    .foregroundColor(.primary)
+                                    .cornerRadius(12)
+                                    .textSelection(.enabled)
+                                Spacer()
+                            } else {
+                                Spacer()
+                                Text(msg.text)
+                                    .padding(8)
+                                    .background(Color.blue)
+                                    .foregroundColor(.white)
+                                    .cornerRadius(12)
+                                    .textSelection(.enabled)
+                            }
+                        }
                     }
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(maxWidth: .infinity)
             }
 
             HStack {

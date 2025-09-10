@@ -3,7 +3,9 @@ import SwiftUI
 final class AppViewModel: ObservableObject {
     let overlay = OverlayController()
     let context = ScreenContext()
-    @Published var messages: [String] = ["👋 Overlay ready."]
+    @Published var messages: [ChatMessage] = [
+        ChatMessage(sender: .assistant, text: "👋 Overlay ready.")
+    ]
     @Published var chat = ChatClient()
 
     func showOverlay() {
@@ -16,7 +18,7 @@ final class AppViewModel: ObservableObject {
             messages: self.messages,
             onSend: { [weak self] text in
                 guard let self = self else { return }
-                self.messages.append("You: \(text)")
+                self.messages.append(ChatMessage(sender: .user, text: text))
                 self.overlay.setContent(rootView: self.makeOverlayView())
 
                 self.chat.send(user: text) { result in
@@ -24,10 +26,10 @@ final class AppViewModel: ObservableObject {
                         guard let self = self else { return }
                         switch result {
                         case .success(let reply):
-                            self.messages.append("Assistant: \(reply)")
+                            self.messages.append(ChatMessage(sender: .assistant, text: reply))
                         case .failure(let err):
                             let raw = (err as NSError).userInfo["raw"] as? String
-                            self.messages.append("⚠️ Error: \(raw ?? err.localizedDescription)")
+                            self.messages.append(ChatMessage(sender: .assistant, text: "⚠️ Error: \(raw ?? err.localizedDescription)"))
                         }
                         self.overlay.setContent(rootView: self.makeOverlayView())
                     }
@@ -37,7 +39,7 @@ final class AppViewModel: ObservableObject {
                 guard let self = self else { return }
                 Task { @MainActor in
                     let grabbed = await self.context.getContextText()
-                    self.messages.append("• Captured preview:\n\(String(grabbed.prefix(300)))…")
+                    self.messages.append(ChatMessage(sender: .assistant, text: "• Captured preview:\n\(String(grabbed.prefix(300)))…"))
                     self.chat.attachContext(grabbed)
                     self.overlay.setContent(rootView: self.makeOverlayView())
                 }
