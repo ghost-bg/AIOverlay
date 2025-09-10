@@ -24,4 +24,15 @@ final class OverlayController {
         }
         window?.contentView = NSHostingView(rootView: AnyView(rootView))
     }
+
+    func hide() {
+        window?.orderOut(nil)
+    }
+
+    func show() {
+        if let window = window {
+            window.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+        }
+    }
 }
